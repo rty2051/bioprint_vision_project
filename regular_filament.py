@@ -12,6 +12,20 @@ import numpy as np
 
 IMAGE_PATH = "C:\\Users\\Prometheus\\Downloads\\bioprint_vision_project\\images\\no_back_white.jpg"
 
+
+def iou(boxA, boxB):
+    xA = max(boxA[0], boxB[0])
+    yA = max(boxA[1], boxB[1])
+    xB = min(boxA[0] + boxA[2], boxB[0] + boxB[2])
+    yB = min(boxA[1] + boxA[3], boxB[1] + boxB[3])
+
+    inter = max(0, xB - xA) * max(0, yB - yA)
+    areaA = boxA[2] * boxA[3]
+    areaB = boxB[2] * boxB[3]
+    union = areaA + areaB - inter
+
+    return inter / union if union > 0 else 0
+
 def main():
     img = cv.imread(IMAGE_PATH)
 
@@ -35,32 +49,58 @@ def main():
     # Canny edge detection
     edges = cv.Canny(blurred, 50, 150)
 
-    contours, _ = cv.findContours(edges, cv.RETR_LIST, cv.CHAIN_APPROX_NONE)
+    # Find contours
+    contours, _ = cv.findContours(edges, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
-    # Pixel Counting for Edges
-    edge_lengths = []
+    # Filter overlapping contours
+    filtered = []
+    boxes = [cv.boundingRect(c) for c in contours]
     for i, cnt in enumerate(contours):
-        length = cv.arcLength(cnt, closed=False)
-        edge_lengths.append(length)
-        print(f"Edge {i}: length = {length:.2f} pixels")
+        keep = True
+        for j in range(i):
+            if iou(boxes[i], boxes[j]) > 0.9:
+                keep = False
+                break
+        if keep:
+            filtered.append(cnt)
 
-    # Display
+    true_squares = []
+    rng = np.random.default_rng(42)
     output = cv.cvtColor(edges, cv.COLOR_GRAY2BGR)
-    for i, cnt in enumerate(contours):
-        cv.drawContours(output, [cnt], -1, (0, 255, 0), 1)
-        x, y = cnt[0][0]
-        cv.putText(output, f"{i}: {int(cv.arcLength(cnt, False))}",
-                (x, y), cv.FONT_HERSHEY_SIMPLEX,
-                0.5, (0, 0, 255), 1)
+    for cnt in filtered:
+        # Approximate contour to polygon
+        peri = cv.arcLength(cnt, True)
+        approx = cv.approxPolyDP(cnt, 0.05 * peri, True)
+
+        # Step 1 + 2: check 4 corners and convexity
+        if len(approx) == 4 and cv.isContourConvex(approx):
+            # Step 3: check side lengths
+            pts = approx.reshape(4, 2)
+            sides = [np.linalg.norm(pts[i] - pts[(i + 1) % 4]) for i in range(4)]
+            if max(sides) / min(sides) <= 1.2:  # roughly equal sides
+                true_squares.append(approx)
+
+                # Draw immediately in random color (optional)
+                color = rng.integers(0, 256, size=3).tolist()
+                cv.drawContours(output, [approx], -1, color, 2)
+
+#    # Draw Squares
+#     output = cv.cvtColor(edges, cv.COLOR_GRAY2BGR)
+#     rng = np.random.default_rng(42)  # fixed seed (optional)
+#     for cnt in filtered:
+#         color = rng.integers(0, 256, size=3).tolist()
+#         cv.drawContours(output, [cnt], -1, color, 2)
+
     # Resize ONLY for display
     output_resized = cv.resize(
         output, None,
-        fx=0.7, fy=0.7,
+        fx=0.5, fy=0.5,
         interpolation=cv.INTER_LINEAR
     )
     cv.imshow("Edge Lengths", output_resized)
     cv.waitKey(0)
     cv.destroyAllWindows()
+    cv.imwrite("labeled_contours.png", output)
 
 
     # display = cv.resize(edges, None, fx=0.5, fy=0.5, interpolation=cv.INTER_LINEAR)    
