@@ -47,7 +47,7 @@ def main():
     blurred = cv.GaussianBlur(gray, (11, 11), 0)
 
     # Canny edge detection
-    edges = cv.Canny(blurred, 50, 150)
+    edges = cv.Canny(blurred, 30, 120)
 
     # Find contours
     contours, _ = cv.findContours(edges, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
@@ -65,12 +65,13 @@ def main():
             filtered.append(cnt)
 
     true_squares = []
+    square_sides = []
     rng = np.random.default_rng(42)
     output = cv.cvtColor(edges, cv.COLOR_GRAY2BGR)
     for cnt in filtered:
         # Approximate contour to polygon
         peri = cv.arcLength(cnt, True)
-        approx = cv.approxPolyDP(cnt, 0.05 * peri, True)
+        approx = cv.approxPolyDP(cnt, 0.04 * peri, True)
 
         # Step 1 + 2: check 4 corners and convexity
         if len(approx) == 4 and cv.isContourConvex(approx):
@@ -79,10 +80,15 @@ def main():
             sides = [np.linalg.norm(pts[i] - pts[(i + 1) % 4]) for i in range(4)]
             if max(sides) / min(sides) <= 1.2:  # roughly equal sides
                 true_squares.append(approx)
+                square_sides.append(sides)  # <-- store side lengths for this square
 
                 # Draw immediately in random color (optional)
                 color = rng.integers(0, 256, size=3).tolist()
                 cv.drawContours(output, [approx], -1, color, 2)
+
+    # Example: print side lengths of each square
+    for i, sides in enumerate(square_sides):
+        print(f"Square {i}: Side Average = {sum(sides) / 4}")
 
 #    # Draw Squares
 #     output = cv.cvtColor(edges, cv.COLOR_GRAY2BGR)
