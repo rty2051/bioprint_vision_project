@@ -1,30 +1,19 @@
-#!/usr/bin/env python3.11.0
+#!/usr/bin/env python3.11
 """
-File: regular_filament.py
+File: save_filtered_contour_lengths.py
 Author: Ryan Yam, @rty2051
-Description: Scan and detect the printed object shape using regular filament. Counts pixels to determine dimensions
+Description: Detects shapes, merges nearly-continuous contours, labels them,
+             filters contours based on pixel length, saves labeled image and pixel lengths.
 """
 
 import cv2 as cv
 import cv2
 import numpy as np
 
-
-IMAGE_PATH = "C:\\Users\\Prometheus\\Downloads\\bioprint_vision_project\\images\\no_back_white.jpg"
-
-
-def iou(boxA, boxB):
-    xA = max(boxA[0], boxB[0])
-    yA = max(boxA[1], boxB[1])
-    xB = min(boxA[0] + boxA[2], boxB[0] + boxB[2])
-    yB = min(boxA[1] + boxA[3], boxB[1] + boxB[3])
-
-    inter = max(0, xB - xA) * max(0, yB - yA)
-    areaA = boxA[2] * boxA[3]
-    areaB = boxB[2] * boxB[3]
-    union = areaA + areaB - inter
-
-    return inter / union if union > 0 else 0
+# IMAGE_PATH = "C:\\Users\\Prometheus\\Downloads\\bioprint_vision_project\\images\\better_res_orange.jpg"
+IMAGE_PATH = "C:\\Users\\Prometheus\\Downloads\\bioprint_vision_project\\images\\better_res_orange.jpg"
+OUTPUT_IMAGE = "LABELED_CONTOURS.png"
+OUTPUT_TXT = "CONTOUR_LENGTHS.txt"
 
 def main():
     img = cv.imread(IMAGE_PATH)
@@ -32,86 +21,73 @@ def main():
     # Crop to build area
     x1, y1 = 3900, 3
     x2, y2 = 880, 2479
-
     x_min = min(x1, x2)
     x_max = max(x1, x2)
     y_min = min(y1, y2)
     y_max = max(y1, y2)
-
     crop = img[y_min:y_max, x_min:x_max]
 
-    # Convert to grayscale
+    # Convert to grayscale and blur
     gray = cv.cvtColor(crop, cv.COLOR_BGR2GRAY)
-
-    # (Optional but recommended) Reduce noise
-    blurred = cv.GaussianBlur(gray, (11, 11), 0)
+    blurred = cv.GaussianBlur(gray, (9, 9), 0)
 
     # Canny edge detection
-    edges = cv.Canny(blurred, 30, 120)
+    edges = cv.Canny(blurred, 0, 55)
 
-    # Find contours
-    contours, _ = cv.findContours(edges, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    # Create binary mask from edges
+    mask = edges.copy()
+    mask[mask > 0] = 255
 
-    # Filter overlapping contours
-    filtered = []
-    boxes = [cv.boundingRect(c) for c in contours]
-    for i, cnt in enumerate(contours):
-        keep = True
-        for j in range(i):
-            if iou(boxes[i], boxes[j]) > 0.9:
-                keep = False
-                break
-        if keep:
-            filtered.append(cnt)
+    # Dilate mask to connect nearly-touching contours
+    kernel = np.ones((7, 7), np.uint8)  # 3x3 kernel connects 1-pixel gaps
+    dilated = cv.dilate(mask, kernel, iterations=1)
 
-    true_squares = []
-    square_sides = []
+    # Find contours on dilated mask
+    contours, _ = cv.findContours(dilated, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+
     rng = np.random.default_rng(42)
     output = cv.cvtColor(edges, cv.COLOR_GRAY2BGR)
-    for cnt in filtered:
-        # Approximate contour to polygon
-        peri = cv.arcLength(cnt, True)
-        approx = cv.approxPolyDP(cnt, 0.04 * peri, True)
 
-        # Step 1 + 2: check 4 corners and convexity
-        if len(approx) == 4 and cv.isContourConvex(approx):
-            # Step 3: check side lengths
-            pts = approx.reshape(4, 2)
-            sides = [np.linalg.norm(pts[i] - pts[(i + 1) % 4]) for i in range(4)]
-            if max(sides) / min(sides) <= 1.2:  # roughly equal sides
-                true_squares.append(approx)
-                square_sides.append(sides)  # <-- store side lengths for this square
+    # Dictionary to store pixel lengths of valid contours
+    contour_lengths = {}
 
-                # Draw immediately in random color (optional)
-                color = rng.integers(0, 256, size=3).tolist()
-                cv.drawContours(output, [approx], -1, color, 2)
+    for idx, cnt in enumerate(contours):
+        # Pixel length of contour
+        pixel_length = len(cnt)
 
-    # Example: print side lengths of each square
-    for i, sides in enumerate(square_sides):
-        print(f"Square {i}: Side Average = {sum(sides) / 4}")
+        # Filter: remove contours with length ~50 ± 1 or > 1000
+        if 49 <= pixel_length <= 80 or pixel_length > 1000 or pixel_length < 40:
+            continue
 
-#    # Draw Squares
-#     output = cv.cvtColor(edges, cv.COLOR_GRAY2BGR)
-#     rng = np.random.default_rng(42)  # fixed seed (optional)
-#     for cnt in filtered:
-#         color = rng.integers(0, 256, size=3).tolist()
-#         cv.drawContours(output, [cnt], -1, color, 2)
+        # Store pixel length
+        contour_lengths[idx] = pixel_length
 
-    # Resize ONLY for display
-    output_resized = cv.resize(
-        output, None,
-        fx=0.5, fy=0.5,
-        interpolation=cv.INTER_LINEAR
-    )
-    cv.imshow("Edge Lengths", output_resized)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
-    cv.imwrite("labeled_contours.png", output)
+        # Draw contour in random color
+        color = rng.integers(0, 256, size=3).tolist()
+        cv.drawContours(output, [cnt], -1, color, 2)
 
+        # Label contour at centroid
+        M = cv.moments(cnt)
+        if M["m00"] != 0:
+            cX = int(M["m10"] / M["m00"])
+            cY = int(M["m01"] / M["m00"])
+        else:
+            cX, cY = cnt[0][0]
+        cv.putText(output, str(idx), (cX, cY), cv.FONT_HERSHEY_SIMPLEX,
+                   1, (255, 255, 255), 2, cv.LINE_AA)
 
-    # display = cv.resize(edges, None, fx=0.5, fy=0.5, interpolation=cv.INTER_LINEAR)    
-    # cv.imshow("Test", display)
-    # cv.waitKey(0)
-    # cv.destroyAllWindows()
+    # Save the labeled image
+    cv.imwrite(OUTPUT_IMAGE, output)
+    print(f"Labeled image saved as '{OUTPUT_IMAGE}'")
 
-main()
+    # Save filtered contour lengths to TXT
+    with open(OUTPUT_TXT, "w") as f:
+        for idx, length in contour_lengths.items():
+            f.write(f"Contour {idx}: {length} pixels\n")
+
+    print(f"Filtered contour lengths saved as '{OUTPUT_TXT}'")
+
+    return contour_lengths
+
+if __name__ == "__main__":
+    lengths_dict = main()
