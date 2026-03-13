@@ -231,7 +231,7 @@ if __name__ == "__main__":
         checkerboard=(9, 6),
         square_size_mm=25.0,
         output_npz=CALIBRATION_OUTPUT,
-        visualize=True,
+        visualize=False,
     )
 
     H, camera_matrix, dist_coeffs = compute_homography(
