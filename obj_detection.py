@@ -36,25 +36,28 @@ def object_detection():
   hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
   # Lower and upper bounds for green in HSV
-  lower_green = np.array([60, 110, 52])   # H, S, V
+  lower_green = np.array([60, 140, 52])   # H, S, V
   upper_green = np.array([85, 255, 235])
 
   mask = cv2.inRange(hsv, lower_green, upper_green)
 
   # Remove small noise
-  kernel = np.ones((9, 9), np.uint8)
+  kernel = np.ones((1, 1), np.uint8)
   mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
   # Close small holes
+  kernel = np.ones((11, 11), np.uint8)
   mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
   # Initialize GrabCut with the mask
-  bgdModel = np.zeros((1,65), np.float64)
-  fgdModel = np.zeros((1,65), np.float64)
-  mask2 = np.where(mask==255, 1, 0).astype('uint8')
+  # bgdModel = np.zeros((1,65), np.float64)
+  # fgdModel = np.zeros((1,65), np.float64)
+  # mask2 = np.where(mask==255, 1, 0).astype('uint8')
+  # # mask2 = np.full(mask.shape, cv2.GC_PR_BGD, dtype=np.uint8)
+  # # mask2[mask == 255] = cv2.GC_FGD
 
-  cv2.grabCut(image, mask2, None, bgdModel, fgdModel, 5, cv2.GC_INIT_WITH_MASK)
-  final_mask = np.where((mask2==1) | (mask2==3), 255, 0).astype('uint8')
-
+  # cv2.grabCut(image, mask2, None, bgdModel, fgdModel, 5, cv2.GC_INIT_WITH_MASK)
+  # final_mask = np.where((mask2==1) | (mask2==3), 255, 0).astype('uint8')
+  final_mask = mask
   cv2.imwrite("test_images/green_object_mask.png", final_mask)
 
   # Find contours in the final mask
@@ -67,5 +70,5 @@ def object_detection():
 
 if __name__ == "__main__":
     print("Press Ctrl+C to stop.")
-    get_hsv_at_cursor()
-    # object_detection()
+    # get_hsv_at_cursor()
+    object_detection()
