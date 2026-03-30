@@ -1,6 +1,6 @@
 import cv2
 import numpy as np 
-import pyautogui
+# import pyautogui
 import cv2
 import time
 
@@ -27,7 +27,8 @@ def get_hsv_at_cursor():
         time.sleep(0.5)  # update every 0.5 seconds
 
 def object_detection():
-  TEST_IMAGE = "images\\better_square_photos\\better_cam_1.jpg"
+  # TEST_IMAGE = "images\\better_square_photos\\better_cam_1.jpg"
+  TEST_IMAGE = "/home/ryam/Desktop/bioprint_vision_project/images/better_square_photos/better_cam_1.jpg"
 
   # Load image
   image = cv2.imread(TEST_IMAGE)
@@ -66,7 +67,17 @@ def object_detection():
   # Draw contours on a copy of the original image
   contour_image = image.copy()
   cv2.drawContours(contour_image, contours, -1, (0, 0, 255), 2)
+
+  # Crop to contour [0]
+  x, y, w, h = cv2.boundingRect(contours[0])
+  cropped = contour_image[y:y+h, x:x+w]
+  cv2.imwrite("test_images/green_object_cropped.png", cropped)
   cv2.imwrite("test_images/green_object_contours.png", contour_image)
+
+  # Compute the area of each contour
+  for i, cnt in enumerate(contours[1:]):
+    area = cv2.contourArea(cnt)
+    print(f"Contour {i} area:", area)
 
 if __name__ == "__main__":
     print("Press Ctrl+C to stop.")
