@@ -28,7 +28,7 @@ def get_hsv_at_cursor():
 
 def object_detection():
   # TEST_IMAGE = "images\\better_square_photos\\better_cam_1.jpg"
-  TEST_IMAGE = "/home/ryam/Desktop/bioprint_vision_project/images/better_square_photos/better_cam_1.jpg"
+  TEST_IMAGE = "images\A5C5UniformScaffold3\DETECTED2.jpg"
 
   # Load image
   image = cv2.imread(TEST_IMAGE)
@@ -66,7 +66,7 @@ def object_detection():
 
   # Draw contours on a copy of the original image
   contour_image = image.copy()
-  cv2.drawContours(contour_image, contours, -1, (0, 0, 255), 2)
+  cv2.drawContours(contour_image, contours, -1, (0, 0, 255), 5)
 
   # Crop to contour [0]
   x, y, w, h = cv2.boundingRect(contours[0])

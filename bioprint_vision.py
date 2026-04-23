@@ -56,12 +56,12 @@ def compute_adaptive_green_bounds(hsv_image, h_std_factor=2.0, s_std_factor=1.5,
     lower = np.array([
         max(0,   int(h_mean - h_std_factor * h_std)),
         max(0,   int(s_mean - s_std_factor * s_std)),
-        max(52,   int(v_mean - v_std_factor * v_std)),
+        max(70,   int(v_mean - v_std_factor * v_std)),
     ])
     upper = np.array([
-        min(179, int(h_mean + h_std_factor * h_std)),
+        min(80, int(h_mean + h_std_factor * h_std) + 10),
         255,
-        min(255, int(v_mean + v_std_factor * v_std)),
+        min(200, int(v_mean + v_std_factor * v_std) + 10),
     ])
 
     print(f"[Adaptive HSV] lower={lower}  upper={upper}")
@@ -83,8 +83,8 @@ def object_detection(image_path=None):
     # margin_y = int(0.10 * h)
     # margin_x = int(0.10 * w)
     # cropped = image[margin_y:h - margin_y, margin_x:w - margin_x]
-    # image = cropped
-    # cv2.imwrite("test_images/green_cropped.png", cropped)
+        # image = cropped
+        # cv2.imwrite("test_images/green_cropped.png", cropped)
 
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
@@ -158,7 +158,7 @@ def contour_area_mm2(contours, calibration_path):
 
 if __name__ == "__main__":
     # get_hsv_at_cursor()
-    path = "images/A5C5UniformScaffold3/layer_002_001.jpg"
+    path = "images\\A5C5Scaffold2\\layer_001_001.jpg"
     contours  = object_detection(path)
     areas_mm2 = contour_area_mm2(contours[1:], "calibration/calibration_data.npz")
 
@@ -166,13 +166,13 @@ if __name__ == "__main__":
         print(f"Contour {i + 1} area: {area:.2f} mm²")
 
     # Label contours on saved image
-    image = cv2.imread(path)
+    image = cv2.imread("test_images/green_object_contours.png")
     for i, cnt in enumerate(contours[1:]):
         x, y, w, h = cv2.boundingRect(cnt)
         cv2.putText(
             image, f"{areas_mm2[i]:.2f} mm^2",
             (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX,
-            0.5, (0, 0, 255), 1
+            0.55, (0, 0, 255), 2
         )
     cv2.imwrite("test_images/green_object_labeled.png", image)
 
