@@ -181,6 +181,13 @@ def object_detection(
     if image is None:
         raise FileNotFoundError(f"Could not load image: {image_path}")
 
+    # Crop the image to the center
+    h, w = image.shape[:2]
+    crop_size = int(min(h, w) * 0.5)
+    x_start = (w - crop_size) // 2
+    y_start = (h - crop_size) // 2
+    image = image[y_start : y_start + crop_size, x_start : x_start + crop_size]
+
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
     # ── Determine the dominant hue automatically ───────────────────────────
@@ -326,7 +333,7 @@ def main() -> None:
         v_std_factor=args.v_std_factor,
     )
 
-    measured_contours = contours[1:]  # skip the outermost envelope contour
+    measured_contours = contours[2:]  # skip the outermost envelope contour
 
     if not measured_contours:
         print("\nNo inner contours found — nothing to measure.")
